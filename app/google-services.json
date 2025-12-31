@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "457540882782",
+    "project_id": "trackxp-78a4e",
+    "storage_bucket": "trackxp-78a4e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:457540882782:android:c85f08bfb49578f7aabfcf",
+        "android_client_info": {
+          "package_name": "com.example.expense_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzExT1WpTZh3nzAf5T04C5XQWxRN6UDZY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
