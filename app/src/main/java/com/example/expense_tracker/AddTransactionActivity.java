@@ -25,20 +25,26 @@ public class AddTransactionActivity extends AppCompatActivity {
         viewPager = findViewById(R.id.viewPager);
         btnBack = findViewById(R.id.btnBack);
 
-        // 2. Use the External Adapter
+        // 2. Setup the Adapter (This loads the 3 Fragments)
         ViewPagerAdapter adapter = new ViewPagerAdapter(this);
         viewPager.setAdapter(adapter);
 
-        // 3. Connect Tabs (Text) to ViewPager (Screens)
+        // 3. Connect Tabs to Fragments (This names the tabs)
         new TabLayoutMediator(tabLayout, viewPager,
                 (tab, position) -> {
                     switch (position) {
-                        case 0: tab.setText("Expense"); break;
-                        case 1: tab.setText("Loan"); break;
-                        case 2: tab.setText("Investment"); break;
+                        case 0:
+                            tab.setText("Expense"); // Label for Tab 1
+                            break;
+                        case 1:
+                            tab.setText("Loan");    // Label for Tab 2
+                            break;
+                        case 2:
+                            tab.setText("Investment"); // Label for Tab 3
+                            break;
                     }
                 }
-        ).attach();
+        ).attach(); // <--- This assumes the Sticky Tabs are attached to the ViewPager
 
         // 4. Back Button Logic
         btnBack.setOnClickListener(v -> finish());

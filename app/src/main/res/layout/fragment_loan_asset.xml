@@ -14,16 +14,16 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Add Expense"
+            android:text="Add Asset (Money Lent)"
             android:textSize="22sp"
             android:textStyle="bold"
-            android:textColor="#FF5252"
+            android:textColor="#388E3C"
             android:layout_marginBottom="20dp"/>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Category"
+            android:text="Borrower Name"
             android:textColor="#808080"
             android:textStyle="bold"
             android:layout_marginBottom="4dp"/>
@@ -31,24 +31,20 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Select Category"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            android:hint="Who did you lend to?"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_marginBottom="16dp">
-
-            <AutoCompleteTextView
-                android:id="@+id/etExpenseCategory"
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etBorrowerName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="none"
-                android:text="Food"
-                />
+                android:inputType="textPersonName" />
         </com.google.android.material.textfield.TextInputLayout>
-
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Expense Amount"
+            android:text="Principal Amount"
             android:textColor="#808080"
             android:textStyle="bold"
             android:layout_marginBottom="4dp"/>
@@ -56,13 +52,12 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="How much did you spend?"
+            android:hint="Enter amount"
             app:prefixText="₹ "
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_marginBottom="16dp">
-
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etExpenseAmount"
+                android:id="@+id/etAssetAmount"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="numberDecimal" />
@@ -71,7 +66,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Date of Expense"
+            android:text="Interest Rate"
             android:textColor="#808080"
             android:textStyle="bold"
             android:layout_marginBottom="4dp"/>
@@ -79,46 +74,73 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Date (dd/mm/yyyy)"
-            app:endIconMode="custom"
-            app:endIconDrawable="@drawable/ic_calendar_today"
+            android:hint="Interest Percentage"
+            app:suffixText="%"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_marginBottom="16dp">
-
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etExpenseDate"
+                android:id="@+id/etAssetInterestRate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="date"
-                android:maxLength="10" />
+                android:inputType="numberDecimal" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Note"
+            android:text="Time Lend &amp; Payment Date"
             android:textColor="#808080"
             android:textStyle="bold"
             android:layout_marginBottom="4dp"/>
 
-        <com.google.android.material.textfield.TextInputLayout
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Description (Optional)"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_marginBottom="24dp">
+            android:orientation="horizontal"
+            android:baselineAligned="false"
+            android:layout_marginBottom="16dp">
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etExpenseNote"
-                android:layout_width="match_parent"
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:inputType="textCapSentences" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:layout_weight="1"
+                android:hint="Start Date"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_calendar_today"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_marginEnd="8dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etAssetStartDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="date"
+                    android:focusable="false"
+                    android:clickable="true" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="End Date"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_calendar_today"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_marginStart="8dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etAssetEndDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="date"
+                    android:focusable="false"
+                    android:clickable="true" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
 
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="#FFEBEE"
+            app:cardBackgroundColor="#E8F5E9"
             app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
             android:layout_marginBottom="24dp">
@@ -132,10 +154,30 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Expense Summary"
+                    android:text="Asset Summary"
                     android:textStyle="bold"
-                    android:textColor="#FF5252"
+                    android:textColor="#388E3C"
                     android:layout_marginBottom="8dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="4dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Interest Earned:"
+                        android:textColor="#666"/>
+                    <TextView
+                        android:id="@+id/tvAssetTotalInterest"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="end"
+                        android:text="₹ 0.00"
+                        android:textStyle="bold"
+                        android:textColor="#000"/>
+                </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -144,16 +186,16 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Total to be Deducted:"
+                        android:text="Final Receivable Amount:"
                         android:textColor="#666"/>
                     <TextView
-                        android:id="@+id/tvExpenseTotal"
+                        android:id="@+id/tvAssetFinalAmount"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="end"
                         android:text="₹ 0.00"
                         android:textStyle="bold"
-                        android:textColor="#FF5252"
+                        android:textColor="#388E3C"
                         android:textSize="16sp"/>
                 </LinearLayout>
 
@@ -161,14 +203,14 @@
         </androidx.cardview.widget.CardView>
 
         <Button
-            android:id="@+id/btnSaveExpense"
+            android:id="@+id/btnSaveAsset"
             android:layout_width="match_parent"
             android:layout_height="60dp"
-            android:text="Confirm &amp; Add to Wallet"
+            android:text="Confirm &amp; Add Asset"
             android:textSize="18sp"
             android:textStyle="bold"
             app:cornerRadius="8dp"
-            android:backgroundTint="#FF5252"/>
+            android:backgroundTint="#388E3C"/>
 
     </LinearLayout>
 </ScrollView>

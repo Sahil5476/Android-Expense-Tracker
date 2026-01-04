@@ -1,64 +1,132 @@
 package com.example.expense_tracker;
 
+import android.app.DatePickerDialog;
 import android.os.Bundle;
-
-import androidx.fragment.app.Fragment;
-
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
 
-/**
- * A simple {@link Fragment} subclass.
- * Use the {@link ExpenseFragment#newInstance} factory method to
- * create an instance of this fragment.
- */
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+
+import com.google.android.material.textfield.TextInputEditText;
+
+import java.util.Calendar;
+import java.util.Locale;
+
 public class ExpenseFragment extends Fragment {
 
-    // TODO: Rename parameter arguments, choose names that match
-    // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-    private static final String ARG_PARAM1 = "param1";
-    private static final String ARG_PARAM2 = "param2";
+    // 1. Declare Variables
+    private TextInputEditText etAmount, etDate, etNote;
+    private AutoCompleteTextView etCategory;
+    private TextView tvExpenseTotal; // The Summary Text
+    private Button btnSave;
+    private Calendar calendar;
 
-    // TODO: Rename and change types of parameters
-    private String mParam1;
-    private String mParam2;
-
-    public ExpenseFragment() {
-        // Required empty public constructor
-    }
-
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment ExpenseFragment.
-     */
-    // TODO: Rename and change types and number of parameters
-    public static ExpenseFragment newInstance(String param1, String param2) {
-        ExpenseFragment fragment = new ExpenseFragment();
-        Bundle args = new Bundle();
-        args.putString(ARG_PARAM1, param1);
-        args.putString(ARG_PARAM2, param2);
-        fragment.setArguments(args);
-        return fragment;
-    }
-
+    @Nullable
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
-            mParam2 = getArguments().getString(ARG_PARAM2);
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_expense, container, false);
+
+        // 2. Initialize Calendar
+        calendar = Calendar.getInstance();
+
+        // 3. Link Views
+        etAmount = view.findViewById(R.id.etExpenseAmount);
+        etCategory = view.findViewById(R.id.etExpenseCategory);
+        etDate = view.findViewById(R.id.etExpenseDate);
+        etNote = view.findViewById(R.id.etExpenseNote);
+        tvExpenseTotal = view.findViewById(R.id.tvExpenseTotal);
+        btnSave = view.findViewById(R.id.btnSaveExpense);
+
+        // 4. Setup Dropdown
+        String[] categories = {"Food", "Transport", "Rent", "Groceries", "Entertainment", "Health", "Other"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, categories);
+        etCategory.setAdapter(adapter);
+
+        // 5. Setup Date Picker
+        etDate.setOnClickListener(v -> showDatePicker());
+        etDate.setFocusable(false);
+        etDate.setClickable(true);
+
+        // 6. Real-time Summary Update (Shows amount in Summary Card as you type)
+        etAmount.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!s.toString().isEmpty()) {
+                    tvExpenseTotal.setText("₹ " + s.toString());
+                } else {
+                    tvExpenseTotal.setText("₹ 0.00");
+                }
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
+
+        // 7. Save Button Logic
+        btnSave.setOnClickListener(v -> saveExpenseLocally());
+
+        return view;
+    }
+
+    private void showDatePicker() {
+        DatePickerDialog datePickerDialog = new DatePickerDialog(getActivity(),
+                (view, year, month, dayOfMonth) -> {
+                    String formattedDate = String.format(Locale.getDefault(), "%02d/%02d/%04d", dayOfMonth, (month + 1), year);
+                    etDate.setText(formattedDate);
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH));
+        datePickerDialog.show();
+    }
+
+    private void saveExpenseLocally() {
+        String amountStr = etAmount.getText().toString().trim();
+        String category = etCategory.getText().toString().trim();
+        String date = etDate.getText().toString().trim();
+        String note = etNote.getText().toString().trim();
+
+        // --- VALIDATION ---
+        if (amountStr.isEmpty()) { etAmount.setError("Required"); return; }
+        if (category.isEmpty()) { etCategory.setError("Required"); return; }
+        if (date.isEmpty()) { etDate.setError("Required"); return; }
+
+        try {
+            double amount = Double.parseDouble(amountStr);
+
+            // --- SAVE TO LOCAL DATABASE ---
+            Transaction t = new Transaction();
+            t.type = "Expense";
+            t.amount = amount;
+            t.category = category;
+            t.date = date;
+            t.note = note;
+            t.timestamp = System.currentTimeMillis();
+
+            // Insert into Room Database
+            AppDatabase.getDatabase(getContext()).transactionDao().insertTransaction(t);
+
+            Toast.makeText(getActivity(), "Expense Added to Wallet!", Toast.LENGTH_SHORT).show();
+            clearFields();
+
+        } catch (NumberFormatException e) {
+            etAmount.setError("Invalid Amount");
         }
     }
 
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_expense, container, false);
+    private void clearFields() {
+        etAmount.setText("");
+        etCategory.setText(""); // Optional: Reset category
+        etDate.setText("");
+        etNote.setText("");
+        tvExpenseTotal.setText("₹ 0.00");
     }
 }
