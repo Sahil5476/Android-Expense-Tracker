@@ -16,7 +16,7 @@ public class DashboardActivity extends AppCompatActivity {
 
     private BottomNavigationView bottomNavigationView;
     private FloatingActionButton fabAdd;
-    private TextView tvWelcome, tvTotalExpense, tvInvested, tvLoanDr, tvLoanCr; // NEW FIELDS
+    private TextView tvWelcome, tvTotalExpense, tvInvested, tvLoanDr, tvLoanCr;
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
 
@@ -32,8 +32,6 @@ public class DashboardActivity extends AppCompatActivity {
         bottomNavigationView = findViewById(R.id.bottom_navigation);
         fabAdd = findViewById(R.id.fab_add);
         tvWelcome = findViewById(R.id.tvWelcome);
-
-        // Link the NEW CardView TextFields
         tvTotalExpense = findViewById(R.id.tvTotalExpense);
         tvInvested = findViewById(R.id.tvInvested);
         tvLoanDr = findViewById(R.id.tvLoanDr);
@@ -41,9 +39,10 @@ public class DashboardActivity extends AppCompatActivity {
 
         // 2. Design Fixes
         bottomNavigationView.setBackground(null);
+        // This line disables the placeholder item in the middle (if using a curved bottom bar)
         bottomNavigationView.getMenu().getItem(2).setEnabled(false);
 
-        // 3. Load User Name
+        // 3. Load User Name from Firebase
         if (mAuth.getCurrentUser() != null) {
             db.collection("users").document(mAuth.getCurrentUser().getUid())
                     .get()
@@ -54,7 +53,7 @@ public class DashboardActivity extends AppCompatActivity {
                     });
         }
 
-        // 4. Navigation & FAB Logic
+        // 4. Navigation Logic
         bottomNavigationView.setOnItemSelectedListener(item -> {
             int id = item.getItemId();
             if (id == R.id.nav_home) return true;
@@ -67,8 +66,10 @@ public class DashboardActivity extends AppCompatActivity {
             return false;
         });
 
+        // 5. FIXED: FAB Click now opens the new Activity
         fabAdd.setOnClickListener(v -> {
-            Toast.makeText(DashboardActivity.this, "Add Clicked", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(DashboardActivity.this, AddTransactionActivity.class);
+            startActivity(intent);
         });
     }
 }

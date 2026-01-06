@@ -1,6 +1,7 @@
 package com.example.expense_tracker;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.widget.Button;
@@ -17,7 +18,6 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-// --- THESE IMPORTS FIX THE RED TEXT ---
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -43,10 +43,9 @@ public class LoginPage extends AppCompatActivity {
     @Override
     public void onStart() {
         super.onStart();
-        // Check if user is already signed in
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
-            goToDashboard();
+            checkLoginExpiry();
         }
     }
 
@@ -62,18 +61,16 @@ public class LoginPage extends AppCompatActivity {
             return insets;
         });
 
-        // 1. Initialize Firebase Auth
         mAuth = FirebaseAuth.getInstance();
 
-        // 2. Configure Google Sign In
-        // IF THIS LINE IS RED, CLICK "BUILD" > "REBUILD PROJECT"
+        // Configure Google Sign In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        // 3. Link Views
+        // Link Views
         etEmail = findViewById(R.id.etEmail);
         etPassword = findViewById(R.id.etPassword);
         btnLogin = findViewById(R.id.btnLogin);
@@ -81,7 +78,7 @@ public class LoginPage extends AppCompatActivity {
         tvForgotPassword = findViewById(R.id.tvForgotPassword);
         tvSignUp = findViewById(R.id.tvSignUp);
 
-        // 4. Listeners
+        // Listeners
         btnLogin.setOnClickListener(v -> loginUser());
         btnGoogle.setOnClickListener(v -> signInWithGoogle());
 
@@ -100,22 +97,29 @@ public class LoginPage extends AppCompatActivity {
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
 
-        if (TextUtils.isEmpty(email)) {
-            etEmail.setError("Email is required");
-            return;
-        }
-        if (TextUtils.isEmpty(password)) {
-            etPassword.setError("Password is required");
-            return;
-        }
+        // Basic check for empty fields (before asking Firebase)
+        if (TextUtils.isEmpty(email)) { etEmail.setError("Email is required"); return; }
+        if (TextUtils.isEmpty(password)) { etPassword.setError("Password is required"); return; }
 
         mAuth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
+                        // SUCCESS
+                        saveLoginTimestamp();
                         Toast.makeText(LoginPage.this, "Login Successful!", Toast.LENGTH_SHORT).show();
                         goToDashboard();
                     } else {
-                        Toast.makeText(LoginPage.this, "Login Failed: " + task.getException().getMessage(), Toast.LENGTH_LONG).show();
+                        // FAIL: Show generic red error on BOTH fields
+                        String genericError = "Incorrect Email or Password";
+
+                        // This turns the field outline red and shows the exclamation icon
+                        etEmail.setError(genericError);
+                        etPassword.setError(genericError);
+
+                        // Also focus on email so they can start over
+                        etEmail.requestFocus();
+
+                        Toast.makeText(LoginPage.this, "Login Failed: Incorrect Credentials", Toast.LENGTH_SHORT).show();
                     }
                 });
     }
@@ -146,6 +150,7 @@ public class LoginPage extends AppCompatActivity {
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
+                        saveLoginTimestamp();
                         Toast.makeText(LoginPage.this, "Google Login Successful!", Toast.LENGTH_SHORT).show();
                         goToDashboard();
                     } else {
@@ -154,8 +159,29 @@ public class LoginPage extends AppCompatActivity {
                 });
     }
 
+    // --- HELPER METHODS ---
+    private void saveLoginTimestamp() {
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putLong("login_timestamp", System.currentTimeMillis());
+        editor.apply();
+    }
+
+    private void checkLoginExpiry() {
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        long lastLoginTime = prefs.getLong("login_timestamp", 0);
+        long currentTime = System.currentTimeMillis();
+        long thirtyDaysInMillis = 30L * 24 * 60 * 60 * 1000;
+
+        if ((currentTime - lastLoginTime) < thirtyDaysInMillis) {
+            goToDashboard();
+        } else {
+            mAuth.signOut();
+            Toast.makeText(this, "Session Expired. Please login again.", Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void goToDashboard() {
-        // UPDATED: Now points to dashboardActivity.class
         Intent intent = new Intent(LoginPage.this, DashboardActivity.class);
         startActivity(intent);
         finish();
