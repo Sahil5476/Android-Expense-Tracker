@@ -3,8 +3,12 @@ package com.example.expense_tracker;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.View;
-import android.widget.Button;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.widget.ImageView;
+import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,13 +20,17 @@ import com.google.firebase.auth.FirebaseAuth;
 
 public class StartPage extends AppCompatActivity {
 
+    // Animation & Views
+    Animation popAnim;
+    ImageView logoImage;
+    TextView sloganText;
+
+    // Time to wait before changing screens (in milliseconds)
+    private static int SPLASH_SCREEN_TIMEOUT = 3000; // 3 seconds
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // --- 1. AUTO-LOGIN CHECK (30 DAYS LOGIC) ---
-        checkAutoLogin();
-        // -------------------------------------------
 
         // Hide Title Bar
         if (getSupportActionBar() != null) {
@@ -30,19 +38,37 @@ public class StartPage extends AppCompatActivity {
         }
 
         EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_start_page);
+        setContentView(R.layout.activity_flash_screen);
 
-        Button startButton = findViewById(R.id.button);
+        // 1. Hooks
+        logoImage = findViewById(R.id.imageView);
+        sloganText = findViewById(R.id.textView);
 
-        // --- 2. BUTTON REDIRECT ---
-        startButton.setOnClickListener(new View.OnClickListener() {
+        // 2. Animations
+        popAnim = AnimationUtils.loadAnimation(this, R.anim.pop_up);
+
+        // Run Animations
+        if (logoImage != null) {
+            logoImage.startAnimation(popAnim);
+        }
+
+        if (sloganText != null) {
+            // Delay text appearance slightly so it pops after logo
+            new Handler().postDelayed(() -> {
+                sloganText.setVisibility(View.VISIBLE);
+                sloganText.startAnimation(popAnim);
+            }, 800);
+        }
+
+        // 3. Automatic Navigation Logic
+        // This handler waits 3 seconds, then decides where to go
+        new Handler().postDelayed(new Runnable() {
             @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(StartPage.this, LoginPage.class);
-                startActivity(intent);
-                // We do NOT call finish() here, so the user can come back if they want
+            public void run() {
+                // Determine destination
+                checkLoginAndNavigate();
             }
-        });
+        }, SPLASH_SCREEN_TIMEOUT);
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -51,29 +77,39 @@ public class StartPage extends AppCompatActivity {
         });
     }
 
-    private void checkAutoLogin() {
+    private void checkLoginAndNavigate() {
         FirebaseAuth auth = FirebaseAuth.getInstance();
+        boolean isLoggedIn = false;
 
-        // Check if user is logged into Firebase
+        // Check Firebase User
         if (auth.getCurrentUser() != null) {
-            // User is technically logged in, now check the 30-day timer
             SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
             long lastLoginTime = prefs.getLong("login_timestamp", 0);
             long currentTime = System.currentTimeMillis();
-
-            // 30 Days in Milliseconds: 30 * 24 hours * 60 min * 60 sec * 1000 ms
             long thirtyDaysInMillis = 30L * 24 * 60 * 60 * 1000;
 
+            // Check 30 Day Expiry
             if ((currentTime - lastLoginTime) < thirtyDaysInMillis) {
-                // SUCCESS: It has been less than 30 days. Go to Dashboard directly.
-                Intent intent = new Intent(StartPage.this, DashboardActivity.class);
-                startActivity(intent);
-                finish(); // Close StartPage so back button doesn't bring them here
+                isLoggedIn = true;
             } else {
-                // EXPIRED: It has been more than 30 days. Force Logout.
+                // Expired: Sign out
                 auth.signOut();
-                // Stay on StartPage so they have to click "Get Started" and Login again.
+                isLoggedIn = false;
             }
         }
+
+        // Navigate based on result
+        if (isLoggedIn) {
+            // User is valid -> Dashboard
+            Intent intent = new Intent(StartPage.this, DashboardActivity.class);
+            startActivity(intent);
+        } else {
+            // User not logged in (or expired) -> Login Page
+            Intent intent = new Intent(StartPage.this, LoginPage.class);
+            startActivity(intent);
+        }
+
+        // Close the Splash Screen so user can't go back to it
+        finish();
     }
 }
