@@ -21,13 +21,14 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.Executors; // IMPORTED FOR BACKGROUND THREAD
 import java.util.concurrent.TimeUnit;
 
 public class LoanLiabilityFragment extends Fragment {
 
     // 1. Declare Variables
     private TextInputEditText etLender, etAmount, etInterest, etBorrowDate, etPaymentDate;
-    private TextView tvTotalInterest, tvFinalAmount; // For the Summary Card
+    private TextView tvTotalInterest, tvFinalAmount;
     private Button btnSave;
     private Calendar calendar;
 
@@ -57,7 +58,6 @@ public class LoanLiabilityFragment extends Fragment {
         etPaymentDate.setOnClickListener(v -> showDatePicker(etPaymentDate));
 
         // 5. Add TextWatchers for Real-Time Calculation
-        // Whenever user types in Amount or Interest, we recalculate immediately
         TextWatcher calcWatcher = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) { calculateLiability(); }
@@ -65,7 +65,6 @@ public class LoanLiabilityFragment extends Fragment {
         };
         etAmount.addTextChangedListener(calcWatcher);
         etInterest.addTextChangedListener(calcWatcher);
-        // (Date changes also trigger calculation inside showDatePicker)
 
         // 6. Save Button Logic
         btnSave.setOnClickListener(v -> saveLoanLiabilityLocally());
@@ -73,12 +72,17 @@ public class LoanLiabilityFragment extends Fragment {
         return view;
     }
 
+    // --- FIX 1: SAFETY CHECK FOR WINDOW LEAK CRASH ---
     private void showDatePicker(TextInputEditText targetField) {
-        DatePickerDialog datePickerDialog = new DatePickerDialog(getActivity(),
+        // Check if Activity is still alive before showing dialog
+        if (getActivity() == null || getActivity().isFinishing() || getActivity().isDestroyed()) {
+            return;
+        }
+
+        DatePickerDialog datePickerDialog = new DatePickerDialog(requireContext(),
                 (view, year, month, dayOfMonth) -> {
                     String date = String.format(Locale.getDefault(), "%02d/%02d/%04d", dayOfMonth, month + 1, year);
                     targetField.setText(date);
-                    // Recalculate whenever a date is changed
                     calculateLiability();
                 },
                 calendar.get(Calendar.YEAR),
@@ -94,7 +98,6 @@ public class LoanLiabilityFragment extends Fragment {
         String dateStartStr = etBorrowDate.getText().toString().trim();
         String dateEndStr = etPaymentDate.getText().toString().trim();
 
-        // Only calculate if all fields have data
         if (amountStr.isEmpty() || rateStr.isEmpty() || dateStartStr.isEmpty() || dateEndStr.isEmpty()) {
             tvTotalInterest.setText("₹ 0.00");
             tvFinalAmount.setText("₹ 0.00");
@@ -105,7 +108,6 @@ public class LoanLiabilityFragment extends Fragment {
             double principal = Double.parseDouble(amountStr);
             double rate = Double.parseDouble(rateStr);
 
-            // Date Calculation
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
             Date date1 = sdf.parse(dateStartStr);
             Date date2 = sdf.parse(dateEndStr);
@@ -113,23 +115,21 @@ public class LoanLiabilityFragment extends Fragment {
             if (date2 != null && date1 != null) {
                 long diffInMillies = Math.abs(date2.getTime() - date1.getTime());
                 long diffInDays = TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
-                if (diffInDays == 0) diffInDays = 1; // Minimum 1 day
+                if (diffInDays == 0) diffInDays = 1;
 
-                // Interest Formula: (P * R * T) / 100
-                // Here T is in years, so we divide days by 365
                 double interest = (principal * rate * diffInDays) / (365 * 100);
                 double total = principal + interest;
 
-                // Update UI
                 tvTotalInterest.setText(String.format("₹ %.2f", interest));
                 tvFinalAmount.setText(String.format("₹ %.2f", total));
             }
 
         } catch (Exception e) {
-            // If user is typing weird dates or numbers, just ignore errors
+            // Ignore parse errors while typing
         }
     }
 
+    // --- FIX 2: RUN DATABASE SAVE IN BACKGROUND (PREVENTS ANR FREEZE) ---
     private void saveLoanLiabilityLocally() {
         String lender = etLender.getText().toString().trim();
         String amountStr = etAmount.getText().toString().trim();
@@ -137,7 +137,6 @@ public class LoanLiabilityFragment extends Fragment {
         String borrowDateStr = etBorrowDate.getText().toString().trim();
         String paymentDateStr = etPaymentDate.getText().toString().trim();
 
-        // --- VALIDATION ---
         if (lender.isEmpty()) { etLender.setError("Required"); return; }
         if (amountStr.isEmpty()) { etAmount.setError("Required"); return; }
         if (rateStr.isEmpty()) { etInterest.setError("Required"); return; }
@@ -148,7 +147,6 @@ public class LoanLiabilityFragment extends Fragment {
             double principal = Double.parseDouble(amountStr);
             double rate = Double.parseDouble(rateStr);
 
-            // Re-calculate one last time for saving
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
             Date date1 = sdf.parse(borrowDateStr);
             Date date2 = sdf.parse(paymentDateStr);
@@ -165,27 +163,36 @@ public class LoanLiabilityFragment extends Fragment {
             double interestAmount = (principal * rate * diffInDays) / (365 * 100);
             double totalRepayment = principal + interestAmount;
 
-            // --- SAVE TO LOCAL DATABASE ---
+            // Prepare Transaction Object
             Transaction t = new Transaction();
             t.type = "Liability";
-            t.amount = totalRepayment; // Total debt to wallet
-            t.category = "Debt";       // Hardcoded category
-            t.date = paymentDateStr;   // Due date
+            t.amount = totalRepayment;
+            t.category = "Debt";
+            t.date = paymentDateStr;
             t.note = "Borrowed from " + lender;
             t.timestamp = System.currentTimeMillis();
 
-            // Save Specific Loan Details
             t.loanPerson = lender;
             t.loanPrincipal = principal;
             t.loanInterestRate = rate;
             t.loanStartDate = borrowDateStr;
             t.loanEndDate = paymentDateStr;
 
-            // Insert into Room Database
-            AppDatabase.getDatabase(getContext()).transactionDao().insertTransaction(t);
+            // --- DATABASE OPERATION IN BACKGROUND THREAD ---
+            Executors.newSingleThreadExecutor().execute(() -> {
+                // 1. Insert into Database
+                AppDatabase.getDatabase(getContext()).transactionDao().insertTransaction(t);
 
-            Toast.makeText(getActivity(), "Debt Added: ₹" + String.format("%.2f", totalRepayment), Toast.LENGTH_LONG).show();
-            clearFields();
+                // 2. Update UI on Main Thread
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getActivity(), "Debt Added", Toast.LENGTH_SHORT).show();
+                        clearFields();
+                        // Close the parent Activity to return to Dashboard
+                        getActivity().finish();
+                    });
+                }
+            });
 
         } catch (Exception e) {
             Toast.makeText(getActivity(), "Error saving data", Toast.LENGTH_SHORT).show();

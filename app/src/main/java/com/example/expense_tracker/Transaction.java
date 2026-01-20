@@ -2,31 +2,47 @@ package com.example.expense_tracker;
 
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
+import java.io.Serializable;
 
 @Entity(tableName = "transactions")
-public class Transaction {
+public class Transaction implements Serializable {
+
     @PrimaryKey(autoGenerate = true)
     public int id;
 
-    // Common Fields
+    // --- Common Fields ---
     public String type;       // "Expense", "Investment", "Liability", "Asset"
-    public double amount;     // Final calculated amount
-    public String category;
-    public String date;       // dd/mm/yyyy
-    public String note;
-    public long timestamp;    // For sorting
+    public double amount;     // The final number shown in Wallet
+    public String category;   // e.g., "Food", "Rent", "Debt", "Lent"
+    public String date;       // Format: dd/mm/yyyy
+    public String note;       // User's description
+    public long timestamp;    // Used for sorting (Newest first)
 
-    // Investment Specific Fields
+    // --- Investment Specific ---
     public double investPricePerUnit;
     public double investQuantity;
 
-    // Loan Specific Fields
-    public String loanPerson; // Lender or Borrower Name
+    // --- Loan Specific ---
+    public String loanPerson; // Name of Lender or Borrower
     public double loanPrincipal;
     public double loanInterestRate;
     public String loanStartDate;
     public String loanEndDate;
 
-    // Empty Constructor
-    public Transaction() {}
+    // --- Constructor ---
+    public Transaction() {
+        // Empty constructor required by Room Database
+    }
+
+    // --- Optional: toString for easier debugging ---
+    @Override
+    public String toString() {
+        return "Transaction{" +
+                "id=" + id +
+                ", type='" + type + '\'' +
+                ", amount=" + amount +
+                ", category='" + category + '\'' +
+                ", date='" + date + '\'' +
+                '}';
+    }
 }

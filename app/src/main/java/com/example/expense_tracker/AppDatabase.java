@@ -7,17 +7,26 @@ import androidx.room.RoomDatabase;
 
 @Database(entities = {Transaction.class}, version = 1)
 public abstract class AppDatabase extends RoomDatabase {
+
     public abstract TransactionDao transactionDao();
 
-    private static AppDatabase INSTANCE;
+    // 'volatile' ensures that if one thread creates the database,
+    // all other threads see it immediately.
+    private static volatile AppDatabase INSTANCE;
 
-    public static AppDatabase getDatabase(Context context) {
+    public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
-            INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
-                            AppDatabase.class, "expense_tracker_db")
-                    .allowMainThreadQueries() // Allows simple access (use Async in pro apps)
-                    .fallbackToDestructiveMigration()
-                    .build();
+            synchronized (AppDatabase.class) {
+                if (INSTANCE == null) {
+                    INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
+                                    AppDatabase.class, "expense_tracker_db")
+                            // Allows reading/writing on the main UI thread (Good for simple apps)
+                            .allowMainThreadQueries()
+                            // If you change the Transaction columns, this wipes the old DB to prevent crashes
+                            .fallbackToDestructiveMigration()
+                            .build();
+                }
+            }
         }
         return INSTANCE;
     }

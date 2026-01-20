@@ -11,14 +11,17 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
+
+        // 👇 THIS LINE FIXES THE ERROR 👇
+        maven(url = "https://jitpack.io")
     }
 }
 
 rootProject.name = "TrackXp"
 include(":app")
- 

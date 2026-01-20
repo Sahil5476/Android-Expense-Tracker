@@ -25,28 +25,44 @@ public class AddTransactionActivity extends AppCompatActivity {
         viewPager = findViewById(R.id.viewPager);
         btnBack = findViewById(R.id.btnBack);
 
-        // 2. Setup the Adapter (This loads the 3 Fragments)
+        // 2. Setup the Adapter
         ViewPagerAdapter adapter = new ViewPagerAdapter(this);
         viewPager.setAdapter(adapter);
 
-        // 3. Connect Tabs to Fragments (This names the tabs)
+        // --- IMPROVEMENT: OFFSCREEN PAGE LIMIT ---
+        // This keeps fragments in memory to avoid "View not attached" errors
+        // when performing background database saves.
+        viewPager.setOffscreenPageLimit(2);
+
+        // 3. Connect Tabs to Fragments
         new TabLayoutMediator(tabLayout, viewPager,
                 (tab, position) -> {
                     switch (position) {
                         case 0:
-                            tab.setText("Expense"); // Label for Tab 1
+                            tab.setText("Expense");
                             break;
                         case 1:
-                            tab.setText("Loan");    // Label for Tab 2
+                            tab.setText("Loan");
                             break;
                         case 2:
-                            tab.setText("Investment"); // Label for Tab 3
+                            tab.setText("Investment");
                             break;
                     }
                 }
-        ).attach(); // <--- This assumes the Sticky Tabs are attached to the ViewPager
+        ).attach();
 
         // 4. Back Button Logic
-        btnBack.setOnClickListener(v -> finish());
+        btnBack.setOnClickListener(v -> {
+            // Simply close the activity and return to Dashboard
+            finish();
+        });
+    }
+
+    // --- SAFETY MEASURE ---
+    // If the user presses the hardware back button, ensure we finish properly
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        finish();
     }
 }
