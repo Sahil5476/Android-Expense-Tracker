@@ -12,6 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
+import java.util.Locale; // Import Locale for formatting
 
 public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.ViewHolder> {
 
@@ -19,7 +20,7 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
     private List<Transaction> transactionList;
     private OnDeleteClickListener deleteListener;
 
-    // --- NEW FLAG: Controls if the Delete button is visible ---
+    // Flag to Hide/Show Delete Button (For Dashboard vs Wallet)
     private boolean isReadOnly = false;
 
     // Interface to handle delete clicks
@@ -33,7 +34,7 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         this.deleteListener = listener;
     }
 
-    // --- NEW METHOD: Call this to hide the delete button (for Stats screen) ---
+    // Method to set read-only mode (Hides Delete Button)
     public void setReadOnly(boolean readOnly) {
         this.isReadOnly = readOnly;
         notifyDataSetChanged();
@@ -53,7 +54,7 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         holder.tvCategory.setText(transaction.category);
         holder.tvDate.setText(transaction.date);
 
-        // Show Note if it exists, otherwise hide
+        // Show Note if it exists
         if (transaction.note != null && !transaction.note.isEmpty()) {
             holder.tvNote.setText(transaction.note);
             holder.tvNote.setVisibility(View.VISIBLE);
@@ -61,25 +62,30 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
             holder.tvNote.setVisibility(View.GONE);
         }
 
-        // Color Coding: Expense/Liability = RED, Investment/Asset = GREEN
-        // Added safety check for null type
+        // Safety check for null type
         String type = transaction.type != null ? transaction.type : "Expense";
 
-        if (type.equals("Expense") || type.equals("Liability")) {
-            holder.tvAmount.setText("- ₹ " + transaction.amount);
+        // --- FIXED NUMBER FORMATTING LOGIC ---
+        // We use String.format("%.2f", value) to show only 2 decimal places (e.g. 10.50)
+
+        // Negative (-) : Expense AND Asset (Money Out)
+        if (type.equals("Expense") || type.equals("Asset")) {
+            holder.tvAmount.setText(String.format(Locale.getDefault(), "- ₹ %.2f", transaction.amount));
             holder.tvAmount.setTextColor(Color.parseColor("#E53935")); // Red
-        } else {
-            holder.tvAmount.setText("+ ₹ " + transaction.amount);
+        }
+        // Positive (+) : Income AND Liability (Money In)
+        else {
+            holder.tvAmount.setText(String.format(Locale.getDefault(), "+ ₹ %.2f", transaction.amount));
             holder.tvAmount.setTextColor(Color.parseColor("#43A047")); // Green
         }
 
-        // --- UPDATED DELETE BUTTON LOGIC ---
+        // --- DELETE BUTTON LOGIC ---
         if (isReadOnly) {
-            // Stats Screen: Hide the button so user cannot delete
+            // Hide Delete button on Dashboard
             holder.btnDelete.setVisibility(View.GONE);
             holder.btnDelete.setClickable(false);
         } else {
-            // Wallet Screen: Show button and enable click
+            // Show Delete button in Wallet
             holder.btnDelete.setVisibility(View.VISIBLE);
             holder.btnDelete.setClickable(true);
             holder.btnDelete.setOnClickListener(v -> {

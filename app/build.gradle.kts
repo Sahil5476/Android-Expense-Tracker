@@ -27,9 +27,11 @@ android {
             )
         }
     }
+
+    // --- UPDATED: Switched to Java 17 to fix build warnings ---
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
@@ -52,12 +54,14 @@ dependencies {
     implementation("androidx.room:room-runtime:$room_version")
     annotationProcessor("androidx.room:room-compiler:$room_version")
 
+    // --- EXTERNAL LIBRARIES ---
+    // Charts
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    // Image Loading (Glide)
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+
     // --- TESTING ---
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
-        // ... other dependencies
-    // CORRECT Kotlin Syntax:
-    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
-
 }
