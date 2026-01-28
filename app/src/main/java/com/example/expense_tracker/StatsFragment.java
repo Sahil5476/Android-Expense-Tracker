@@ -1,5 +1,6 @@
 package com.example.expense_tracker;
 
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -13,7 +14,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
@@ -129,7 +132,7 @@ public class StatsFragment extends Fragment {
         });
     }
 
-    // --- Helper: Update Chart Styling ---
+    // --- Helper: Update Chart Styling (FIXED FOR DARK MODE) ---
     private void updateChart(List<Entry> entries) {
         if (entries.isEmpty()) {
             lineChart.clear();
@@ -138,7 +141,7 @@ public class StatsFragment extends Fragment {
 
         LineDataSet dataSet = new LineDataSet(entries, currentCategory + " Trend");
 
-        // Dynamic Coloring based on Category
+        // 1. Dynamic Coloring based on Category
         int color;
         if (currentCategory.equals("Expense")) color = Color.parseColor("#E53935"); // Red
         else if (currentCategory.equals("Investment")) color = Color.parseColor("#1976D2"); // Blue
@@ -154,16 +157,33 @@ public class StatsFragment extends Fragment {
         dataSet.setFillColor(color);
         dataSet.setFillAlpha(50); // Slight transparency
 
+        // --- DARK MODE DETECTION ---
+        // Determine if the phone is in Night Mode
+        int nightModeFlags = getContext().getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        int textColor = (nightModeFlags == Configuration.UI_MODE_NIGHT_YES) ? Color.WHITE : Color.BLACK;
+
         LineData lineData = new LineData(dataSet);
+        lineData.setValueTextColor(textColor); // Text color for values (if enabled)
         lineChart.setData(lineData);
 
-        // Graph Styling
-        lineChart.getDescription().setEnabled(false);
+        // --- AXIS STYLING ---
+        XAxis xAxis = lineChart.getXAxis();
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xAxis.setDrawGridLines(false);
+        xAxis.setTextColor(textColor); // <--- Fixes invisible dates in Dark Mode
+
+        YAxis axisLeft = lineChart.getAxisLeft();
+        axisLeft.setTextColor(textColor); // <--- Fixes invisible amounts in Dark Mode
+
         lineChart.getAxisRight().setEnabled(false);
-        lineChart.getXAxis().setPosition(XAxis.XAxisPosition.BOTTOM);
-        lineChart.getXAxis().setDrawGridLines(false);
-        lineChart.animateY(800); // Animate chart
-        lineChart.invalidate();  // Refresh view
+        lineChart.getDescription().setEnabled(false);
+
+        // --- LEGEND STYLING ---
+        Legend legend = lineChart.getLegend();
+        legend.setTextColor(textColor); // <--- Fixes invisible label in Dark Mode
+
+        lineChart.animateY(800);
+        lineChart.invalidate();
     }
 
     // --- Helper: Filter Logic for Date ---

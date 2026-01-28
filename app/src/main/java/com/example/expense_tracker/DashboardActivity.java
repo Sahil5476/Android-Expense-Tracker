@@ -13,7 +13,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.auth.FirebaseUser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,19 +31,20 @@ public class DashboardActivity extends AppCompatActivity {
     private RecyclerView recyclerRecent;
     private TransactionAdapter recentAdapter;
 
-    // Firebase
+    // Data Sources
     private FirebaseAuth mAuth;
-    private FirebaseFirestore db;
+    private AppDatabase localDb; // Replaced Firestore with Local Room DB for speed & offline support
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dashboard);
 
+        // 1. Initialize Data Sources
         mAuth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        localDb = AppDatabase.getDatabase(this);
 
-        // 1. Link Views
+        // 2. Link Views
         bottomNavigationView = findViewById(R.id.bottom_navigation);
         fabAdd = findViewById(R.id.fab_add);
         tvWelcome = findViewById(R.id.tvWelcome);
@@ -59,7 +60,7 @@ public class DashboardActivity extends AppCompatActivity {
         dashboardContent = findViewById(R.id.dashboard_content);
         fragmentContainer = findViewById(R.id.fragment_container);
 
-        // 2. Setup RecyclerView
+        // 3. Setup RecyclerView
         recyclerRecent = findViewById(R.id.recyclerRecent);
         recyclerRecent.setLayoutManager(new LinearLayoutManager(this));
 
@@ -68,14 +69,14 @@ public class DashboardActivity extends AppCompatActivity {
         recentAdapter.setReadOnly(true);
         recyclerRecent.setAdapter(recentAdapter);
 
-        // 3. Navigation Bar Design
+        // 4. Navigation Bar Design
         bottomNavigationView.setBackground(null);
         bottomNavigationView.getMenu().getItem(2).setEnabled(false); // Disable placeholder
 
-        // 4. Load User Name
+        // 5. Load Data Initially
         loadUserData();
 
-        // 5. Navigation Logic
+        // 6. Navigation Logic
         bottomNavigationView.setOnItemSelectedListener(item -> {
             int id = item.getItemId();
 
@@ -84,6 +85,8 @@ public class DashboardActivity extends AppCompatActivity {
                 dashboardContent.setVisibility(View.VISIBLE);
                 fragmentContainer.setVisibility(View.GONE);
                 refreshDashboardData();
+                // Also reload name in case it changed
+                loadUserData();
                 return true;
             } else if (id == R.id.nav_stats) {
                 loadFragment(new StatsFragment());
@@ -92,20 +95,19 @@ public class DashboardActivity extends AppCompatActivity {
                 loadFragment(new WalletFragment());
                 return true;
             } else if (id == R.id.nav_profile) {
-                // --- UPDATE: Load ProfileFragment instead of direct logout ---
                 loadFragment(new ProfileFragment());
                 return true;
             }
             return false;
         });
 
-        // 6. FAB Logic
+        // 7. FAB Logic
         fabAdd.setOnClickListener(v -> {
             Intent intent = new Intent(DashboardActivity.this, AddTransactionActivity.class);
             startActivity(intent);
         });
 
-        // 7. "View All" Logic -> Redirect to Wallet
+        // 8. "View All" Logic -> Redirect to Wallet
         tvViewAll.setOnClickListener(v -> {
             bottomNavigationView.setSelectedItemId(R.id.nav_wallet);
         });
@@ -114,9 +116,10 @@ public class DashboardActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Only refresh data if the dashboard is visible
+        // Refresh data whenever the dashboard becomes visible again
         if (dashboardContent.getVisibility() == View.VISIBLE) {
             refreshDashboardData();
+            loadUserData(); // FIX: Update name immediately if changed in Profile
         }
     }
 
@@ -128,32 +131,56 @@ public class DashboardActivity extends AppCompatActivity {
                 .commit();
     }
 
+    // --- FIX: Robust Name Loading (Local DB -> Google -> Email) ---
     private void loadUserData() {
-        if (mAuth.getCurrentUser() != null) {
-            db.collection("users").document(mAuth.getCurrentUser().getUid())
-                    .get()
-                    .addOnSuccessListener(documentSnapshot -> {
-                        if (documentSnapshot.exists()) {
-                            tvWelcome.setText("Hello, " + documentSnapshot.getString("name"));
-                        }
-                    });
-        }
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null) return;
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            // Priority 1: Check Local Database (User Edited Name)
+            UserProfile savedProfile = localDb.userProfileDao().getUserProfile();
+
+            String nameToDisplay = "User"; // Default
+
+            if (savedProfile != null && savedProfile.name != null && !savedProfile.name.isEmpty()) {
+                nameToDisplay = savedProfile.name;
+            }
+            // Priority 2: Google Account Name
+            else if (user.getDisplayName() != null && !user.getDisplayName().isEmpty()) {
+                nameToDisplay = user.getDisplayName();
+            }
+            // Priority 3: Extract from Email (e.g. "john" from "john@gmail.com")
+            else if (user.getEmail() != null && user.getEmail().contains("@")) {
+                nameToDisplay = user.getEmail().split("@")[0];
+            }
+
+            String finalName = nameToDisplay;
+            runOnUiThread(() -> {
+                tvWelcome.setText("Hello, " + capitalize(finalName));
+            });
+        });
+    }
+
+    // Helper to make names look nice (john -> John)
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) return str;
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 
     // --- Core Logic: Fetch Data and Update UI ---
     private void refreshDashboardData() {
         Executors.newSingleThreadExecutor().execute(() -> {
             // 1. Get Data from Room Database
-            List<Transaction> allTransactions = AppDatabase.getDatabase(this).transactionDao().getAllTransactions();
+            List<Transaction> allTransactions = localDb.transactionDao().getAllTransactions();
 
             // 2. Calculate Totals
             double totalExp = 0, totalInv = 0, totalLiability = 0, totalAsset = 0;
 
             for (Transaction t : allTransactions) {
-                if (t.type.equals("Expense")) totalExp += t.amount;
-                else if (t.type.equals("Investment")) totalInv += t.amount;
-                else if (t.type.equals("Liability")) totalLiability += t.amount;
-                else if (t.type.equals("Asset")) totalAsset += t.amount;
+                if ("Expense".equals(t.type)) totalExp += t.amount;
+                else if ("Investment".equals(t.type)) totalInv += t.amount;
+                else if ("Liability".equals(t.type)) totalLiability += t.amount;
+                else if ("Asset".equals(t.type)) totalAsset += t.amount;
             }
 
             // 3. Prepare Recent List (Top 5 only)

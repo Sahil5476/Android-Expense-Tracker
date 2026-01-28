@@ -5,14 +5,15 @@ import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
 
-// FIX: Added 'exportSchema = false' to stop the build warning
-@Database(entities = {Transaction.class}, version = 1, exportSchema = false)
+// FIX 1: Add UserProfile.class to entities & Increment version to 2
+@Database(entities = {Transaction.class, UserProfile.class}, version = 2, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract TransactionDao transactionDao();
 
-    // 'volatile' ensures that if one thread creates the database,
-    // all other threads see it immediately.
+    // FIX 2: Add this method so "localDb.userProfileDao()" works
+    public abstract UserProfileDao userProfileDao();
+
     private static volatile AppDatabase INSTANCE;
 
     public static AppDatabase getDatabase(final Context context) {
@@ -21,9 +22,8 @@ public abstract class AppDatabase extends RoomDatabase {
                 if (INSTANCE == null) {
                     INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
                                     AppDatabase.class, "expense_tracker_db")
-                            // Allows reading/writing on the main UI thread (Good for simple apps)
                             .allowMainThreadQueries()
-                            // If you change the Transaction columns, this wipes the old DB to prevent crashes
+                            // This handles the upgrade from V1 (Transactions only) to V2 (Transactions + Profile)
                             .fallbackToDestructiveMigration()
                             .build();
                 }

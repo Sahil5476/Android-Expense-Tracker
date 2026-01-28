@@ -136,7 +136,7 @@
         app:layout_constraintHorizontal_bias="0.503"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/tvOrLabel"
-        app:srcCompat="@drawable/screenshot_2025_12_19_225338"
+        app:srcCompat="@drawable/google_logo"
       />
 
 

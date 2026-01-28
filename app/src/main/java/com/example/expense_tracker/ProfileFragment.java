@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.MediaStore;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -23,11 +22,8 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.SetOptions; // Required for merging data
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.Executors;
 
 public class ProfileFragment extends Fragment {
 
@@ -35,21 +31,23 @@ public class ProfileFragment extends Fragment {
     private ImageView ivProfileImage;
     private FloatingActionButton btnEditPhoto;
     private TextInputEditText etName, etEmail, etAge;
-    private Button btnSignOut, btnSave; // Added btnSave
+    private Button btnSignOut, btnSave;
 
-    // Firebase
-    private FirebaseAuth mAuth;
-    private FirebaseFirestore db;
+    // Data Sources
+    private FirebaseAuth mAuth;      // For Login/Email
+    private AppDatabase localDb;     // For Saving Age/Name (Room)
+
     private ActivityResultLauncher<Intent> imagePickerLauncher;
+    private Uri currentImageUri = null; // To track selected image
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_profile, container, false);
 
-        // Initialize Firebase
+        // Initialize Data Sources
         mAuth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        localDb = AppDatabase.getDatabase(getContext());
 
         // 1. Link Views
         ivProfileImage = view.findViewById(R.id.ivProfileImage);
@@ -58,20 +56,19 @@ public class ProfileFragment extends Fragment {
         etEmail = view.findViewById(R.id.etEmail);
         etAge = view.findViewById(R.id.etAge);
         btnSignOut = view.findViewById(R.id.btnSignOut);
-
-        // --- NEW: Link Save Button ---
         btnSave = view.findViewById(R.id.btnSave);
 
-        // 2. Setup Image Picker Logic
+        // Allow name editing since we are saving locally
+        etName.setEnabled(true);
+
+        // 2. Setup Image Picker
         setupImagePicker();
 
-        // 3. Load User Data
+        // 3. Load User Data (Robust Logic)
         loadProfileData();
 
-        // 4. Set Click Listeners
+        // 4. Click Listeners
         btnEditPhoto.setOnClickListener(v -> openGallery());
-
-        // --- NEW: Save Button Listener ---
         btnSave.setOnClickListener(v -> saveProfileData());
 
         btnSignOut.setOnClickListener(v -> {
@@ -84,85 +81,103 @@ public class ProfileFragment extends Fragment {
         return view;
     }
 
-    // --- NEW: Method to Save Age to Firestore ---
+    // --- SAVE DATA TO ROOM DATABASE ---
     private void saveProfileData() {
+        String name = etName.getText().toString().trim();
+        String age = etAge.getText().toString().trim();
+
         FirebaseUser user = mAuth.getCurrentUser();
-        if (user == null) return;
+        String email = (user != null) ? user.getEmail() : "";
+        String photoUriString = (currentImageUri != null) ? currentImageUri.toString() : null;
 
-        String ageText = etAge.getText().toString().trim();
-
-        if (ageText.isEmpty()) {
-            Toast.makeText(getContext(), "Please enter your age", Toast.LENGTH_SHORT).show();
+        if (name.isEmpty()) {
+            etName.setError("Name is required");
+            etName.requestFocus();
             return;
         }
 
-        // Prepare data
-        Map<String, Object> userData = new HashMap<>();
-        userData.put("age", ageText);
+        // Create Profile Object
+        UserProfile profile = new UserProfile(name, email, age, photoUriString);
 
-        // Optional: If you want to allow saving the name as well
-        // userData.put("name", etName.getText().toString().trim());
+        // Save in Background Thread
+        Executors.newSingleThreadExecutor().execute(() -> {
+            localDb.userProfileDao().saveProfile(profile);
 
-        // Write to Firestore (Merge to keep other fields like email/photo safe)
-        db.collection("users").document(user.getUid())
-                .set(userData, SetOptions.merge())
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(getContext(), "Profile Saved!", Toast.LENGTH_SHORT).show();
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() ->
+                        Toast.makeText(getContext(), "Profile Saved Locally!", Toast.LENGTH_SHORT).show()
+                );
+            }
+        });
     }
 
+    // --- LOAD DATA (Robust Version) ---
     private void loadProfileData() {
         FirebaseUser user = mAuth.getCurrentUser();
 
+        // 1. Set Email immediately (It's always available)
         if (user != null) {
             etEmail.setText(user.getEmail());
-
-            if (user.getDisplayName() != null && !user.getDisplayName().isEmpty()) {
-                etName.setText(user.getDisplayName());
-            }
-
-            if (user.getPhotoUrl() != null) {
-                Glide.with(this)
-                        .load(user.getPhotoUrl())
-                        .circleCrop()
-                        .placeholder(R.drawable.ic_person)
-                        .into(ivProfileImage);
-            }
-
-            db.collection("users").document(user.getUid())
-                    .get()
-                    .addOnSuccessListener(documentSnapshot -> {
-                        if (documentSnapshot.exists()) {
-                            // Get Name
-                            String dbName = documentSnapshot.getString("name");
-                            if (dbName != null && !dbName.isEmpty()) {
-                                etName.setText(dbName);
-                            }
-
-                            // Get Age
-                            Object age = documentSnapshot.get("age");
-                            if (age != null) {
-                                etAge.setText(String.valueOf(age));
-                            }
-
-                            // Get Photo
-                            String dbPhotoUrl = documentSnapshot.getString("photoUrl");
-                            if (dbPhotoUrl != null && !dbPhotoUrl.isEmpty()) {
-                                Glide.with(this)
-                                        .load(dbPhotoUrl)
-                                        .circleCrop()
-                                        .placeholder(R.drawable.ic_person)
-                                        .into(ivProfileImage);
-                            }
-                        }
-                    })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(getContext(), "Failed to fetch details", Toast.LENGTH_SHORT).show();
-                    });
         }
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            // Fetch Local Data
+            UserProfile savedProfile = localDb.userProfileDao().getUserProfile();
+
+            // Prepare data variables
+            String nameToShow = "";
+            String ageToShow = "";
+            Uri photoUriToShow = null;
+
+            // STEP A: Check Local Database First
+            if (savedProfile != null) {
+                if (savedProfile.name != null && !savedProfile.name.isEmpty()) {
+                    nameToShow = savedProfile.name;
+                }
+                if (savedProfile.age != null) {
+                    ageToShow = savedProfile.age;
+                }
+                if (savedProfile.photoUri != null) {
+                    photoUriToShow = Uri.parse(savedProfile.photoUri);
+                }
+            }
+
+            // STEP B: If Name is still empty, use Google/Firebase Name
+            if (nameToShow.isEmpty() && user != null) {
+                if (user.getDisplayName() != null && !user.getDisplayName().isEmpty()) {
+                    nameToShow = user.getDisplayName();
+                } else {
+                    // Fallback: Use part before "@" if no name exists
+                    String email = user.getEmail();
+                    if (email != null && email.contains("@")) {
+                        nameToShow = email.split("@")[0];
+                    }
+                }
+            }
+
+            // STEP C: Update UI on Main Thread
+            String finalName = nameToShow;
+            String finalAge = ageToShow;
+            Uri finalPhoto = photoUriToShow;
+
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    etName.setText(finalName);
+                    etAge.setText(finalAge);
+
+                    // Logic for Photo: Local -> Google -> Placeholder
+                    if (finalPhoto != null) {
+                        currentImageUri = finalPhoto;
+                        Glide.with(this).load(finalPhoto).circleCrop().into(ivProfileImage);
+                    } else if (user != null && user.getPhotoUrl() != null) {
+                        Glide.with(this).load(user.getPhotoUrl()).circleCrop().into(ivProfileImage);
+                    } else {
+                        // Default Placeholder if nothing exists
+                        ivProfileImage.setImageResource(R.drawable.ic_person);
+                    }
+                });
+            }
+        });
     }
 
     private void setupImagePicker() {
@@ -170,15 +185,21 @@ public class ProfileFragment extends Fragment {
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
-                        Uri selectedImageUri = result.getData().getData();
-                        if (selectedImageUri != null) {
+                        Uri selectedUri = result.getData().getData();
+                        if (selectedUri != null) {
+                            // FIX: Take persistent permission so image loads after restart
+                            try {
+                                final int takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION;
+                                requireContext().getContentResolver().takePersistableUriPermission(selectedUri, takeFlags);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+
+                            currentImageUri = selectedUri;
                             Glide.with(this)
-                                    .load(selectedImageUri)
+                                    .load(currentImageUri)
                                     .circleCrop()
                                     .into(ivProfileImage);
-
-                            // NOTE: In a complete app, you would upload this image to Firebase Storage here
-                            Toast.makeText(getContext(), "Image selected", Toast.LENGTH_SHORT).show();
                         }
                     }
                 }
@@ -186,7 +207,10 @@ public class ProfileFragment extends Fragment {
     }
 
     private void openGallery() {
-        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        // FIX: Use OPEN_DOCUMENT for persistent access
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
         imagePickerLauncher.launch(intent);
     }
 }

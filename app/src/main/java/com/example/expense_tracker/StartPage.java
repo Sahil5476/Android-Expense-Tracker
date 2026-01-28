@@ -38,7 +38,7 @@ public class StartPage extends AppCompatActivity {
         }
 
         EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_flash_screen);
+        setContentView(R.layout.activity_splash_screen);
 
         // 1. Hooks
         logoImage = findViewById(R.id.imageView);
